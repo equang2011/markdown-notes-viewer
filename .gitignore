@@ -1,0 +1,7 @@
+backend/uploads/
+backend/__pycache__/
+backend/.venv/
+backend/uvicorn.log
+frontend/node_modules/
+frontend/dist/
+frontend/vite.log
