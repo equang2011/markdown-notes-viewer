@@ -7,10 +7,13 @@ export default function UploadForm({ onUploaded }) {
   const [busy, setBusy] = useState(false);
   const inputRef = useRef(null);
 
+  const ALLOWED_EXTENSIONS = [".md", ".html", ".htm"];
+
   async function handleFile(file) {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".md")) {
-      setError("Only .md files are allowed");
+    const name = file.name.toLowerCase();
+    if (!ALLOWED_EXTENSIONS.some((ext) => name.endsWith(ext))) {
+      setError("Only .md and .html files are allowed");
       return;
     }
     setError("");
@@ -42,11 +45,11 @@ export default function UploadForm({ onUploaded }) {
           handleFile(e.dataTransfer.files[0]);
         }}
       >
-        {busy ? "Uploading..." : "Tap to choose a .md file or drag it here"}
+        {busy ? "Uploading..." : "Tap to choose a .md or .html file or drag it here"}
         <input
           ref={inputRef}
           type="file"
-          accept=".md"
+          accept=".md,.html,.htm"
           hidden
           onChange={(e) => handleFile(e.target.files[0])}
         />

@@ -37,10 +37,13 @@ def write_metadata(notes: list[dict]) -> None:
     METADATA_FILE.write_text(json.dumps(notes, indent=2), encoding="utf-8")
 
 
+ALLOWED_EXTENSIONS = (".md", ".html", ".htm")
+
+
 @app.post("/notes")
 async def upload_note(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith(".md"):
-        raise HTTPException(status_code=400, detail="Only .md files are allowed")
+    if not file.filename.lower().endswith(ALLOWED_EXTENSIONS):
+        raise HTTPException(status_code=400, detail="Only .md and .html files are allowed")
 
     dest_path = UPLOADS_DIR / file.filename
     if dest_path.exists():

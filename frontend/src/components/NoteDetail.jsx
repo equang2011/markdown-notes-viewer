@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import DOMPurify from "dompurify";
 import { fetchNote } from "../api";
+
+function isHtmlFilename(filename) {
+  const name = filename.toLowerCase();
+  return name.endsWith(".html") || name.endsWith(".htm");
+}
 
 export default function NoteDetail({ filename, onBack }) {
   const [note, setNote] = useState(null);
@@ -21,7 +27,13 @@ export default function NoteDetail({ filename, onBack }) {
       </button>
       {error && <p className="error">{error}</p>}
       {!note && !error && <p>Loading...</p>}
-      {note && (
+      {note && isHtmlFilename(note.filename) && (
+        <article
+          className="markdown-body"
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(note.content) }}
+        />
+      )}
+      {note && !isHtmlFilename(note.filename) && (
         <article className="markdown-body">
           <ReactMarkdown>{note.content}</ReactMarkdown>
         </article>
