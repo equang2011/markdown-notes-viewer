@@ -76,6 +76,78 @@ h1 {
   color: #777;
 }
 
+.tag-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 1.5rem;
+}
+
+.tag {
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  background: #fff;
+  border: 1px solid #d8d8d8;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  color: #444;
+  cursor: pointer;
+}
+
+.tag-active {
+  background: #4a7dff;
+  border-color: #4a7dff;
+  color: #fff;
+}
+
+.tag-static {
+  cursor: inherit;
+  background: #f0f2f7;
+  border-color: #e2e5ec;
+}
+
+.tag-count {
+  opacity: 0.6;
+  margin-left: 0.15rem;
+}
+
+.note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.15rem;
+}
+
+.note-header {
+  margin-bottom: 1rem;
+}
+
+.note-fields {
+  margin: 0.75rem 0 0;
+  background: #fff;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.note-fields > div {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
+}
+
+.note-fields dt {
+  color: #777;
+  min-width: 7rem;
+}
+
+.note-fields dd {
+  margin: 0;
+  word-break: break-word;
+}
+
 .back-button {
   background: none;
   border: none;

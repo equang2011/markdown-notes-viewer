@@ -3,9 +3,17 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
+
+import frontmatter
+import tagger
 
 BASE_DIR = Path(__file__).parent
 
@@ -38,6 +46,48 @@ def write_metadata(notes: list[dict]) -> None:
 
 
 ALLOWED_EXTENSIONS = (".md", ".html", ".htm")
+MARKDOWN_EXTENSIONS = (".md",)
+
+
+def is_markdown(filename: str) -> bool:
+    return filename.lower().endswith(MARKDOWN_EXTENSIONS)
+
+
+def known_tags(notes: list[dict]) -> list[str]:
+    seen: list[str] = []
+    for note in notes:
+        for tag in note.get("tags") or []:
+            if tag not in seen:
+                seen.append(tag)
+    return seen
+
+
+def autotag(text: str, existing: list[dict]) -> str | None:
+    """Prepend an LLM-suggested frontmatter block to an untagged markdown note.
+
+    Returns the rewritten text, or None to leave the note exactly as uploaded —
+    which is also what happens on any gateway failure.
+    """
+    fields, body = frontmatter.split_frontmatter(text)
+    if fields:
+        return None  # the note already declares its own metadata; don't touch it
+
+    suggestion = tagger.suggest(body, known_tags(existing))
+    if suggestion is None:
+        return None
+
+    block = {k: v for k, v in suggestion.items() if v}
+    return frontmatter.dump(block, body) if block else None
+
+
+def with_defaults(note: dict) -> dict:
+    """Notes uploaded before frontmatter support have no title/tags/meta."""
+    return {
+        **note,
+        "title": note.get("title") or note["filename"],
+        "tags": note.get("tags") or [],
+        "meta": note.get("meta") or {},
+    }
 
 
 @app.post("/notes")
@@ -52,14 +102,39 @@ async def upload_note(file: UploadFile = File(...)):
         dest_path = UPLOADS_DIR / f"{stem}-{timestamp}{suffix}"
 
     contents = await file.read()
-    dest_path.write_bytes(contents)
+    notes = read_metadata()
 
     note = {
         "filename": dest_path.name,
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
         "size_bytes": len(contents),
+        "title": dest_path.name,
+        "tags": [],
+        "meta": {},
     }
 
+    # Frontmatter lives in the stored file, which stays the source of truth; the
+    # block is stripped again when the note is served.
+    if is_markdown(dest_path.name):
+        try:
+            text = contents.decode("utf-8")
+        except UnicodeDecodeError:
+            text = None
+
+        if text is not None:
+            # Blocking gateway call — keep it off the event loop.
+            tagged = await run_in_threadpool(autotag, text, notes)
+            if tagged is not None:
+                text = tagged
+                contents = text.encode("utf-8")
+                note["size_bytes"] = len(contents)
+            fields, _ = frontmatter.parse(text, fallback_title=dest_path.name)
+            note.update(fields)
+
+    dest_path.write_bytes(contents)
+
+    # Re-read rather than reusing the copy from before the tagging call, which
+    # may have blocked for several seconds.
     notes = read_metadata()
     notes.append(note)
     write_metadata(notes)
@@ -68,9 +143,24 @@ async def upload_note(file: UploadFile = File(...)):
 
 
 @app.get("/notes")
-async def list_notes():
-    notes = read_metadata()
+async def list_notes(tag: str | None = Query(default=None)):
+    notes = [with_defaults(n) for n in read_metadata()]
+    if tag:
+        notes = [n for n in notes if tag in n["tags"]]
     return sorted(notes, key=lambda n: n["uploaded_at"], reverse=True)
+
+
+@app.get("/tags")
+async def list_tags():
+    """Every tag in use, with how many notes carry it."""
+    counts: dict[str, int] = {}
+    for note in read_metadata():
+        for tag in note.get("tags") or []:
+            counts[tag] = counts.get(tag, 0) + 1
+    return [
+        {"tag": tag, "count": count}
+        for tag, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
 
 
 @app.get("/notes/{filename}")
@@ -85,7 +175,9 @@ async def get_note(filename: str):
         raise HTTPException(status_code=404, detail="Note file missing on disk")
 
     content = file_path.read_text(encoding="utf-8")
-    return {**note, "content": content}
+    if is_markdown(filename):
+        _, content = frontmatter.split_frontmatter(content)
+    return {**with_defaults(note), "content": content}
 
 
 # Serves the built frontend (frontend/dist copied here at Docker build time).

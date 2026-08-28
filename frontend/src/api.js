@@ -3,9 +3,16 @@
 // backend, which serves both the API and the built frontend).
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
-export async function fetchNotes() {
-  const res = await fetch(`${API_BASE}/notes`);
+export async function fetchNotes(tag) {
+  const query = tag ? `?tag=${encodeURIComponent(tag)}` : "";
+  const res = await fetch(`${API_BASE}/notes${query}`);
   if (!res.ok) throw new Error("Failed to load notes");
+  return res.json();
+}
+
+export async function fetchTags() {
+  const res = await fetch(`${API_BASE}/tags`);
+  if (!res.ok) throw new Error("Failed to load tags");
   return res.json();
 }
 
