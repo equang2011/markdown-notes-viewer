@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import DOMPurify from "dompurify";
-import { fetchNote } from "../api";
+import { fetchNote, deleteNote } from "../api";
 
 function isHtmlFilename(filename) {
   const name = filename.toLowerCase();
@@ -45,6 +45,7 @@ function NoteHeader({ note, onSelectTag }) {
 export default function NoteDetail({ filename, onBack, onSelectTag }) {
   const [note, setNote] = useState(null);
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setNote(null);
@@ -54,11 +55,34 @@ export default function NoteDetail({ filename, onBack, onSelectTag }) {
       .catch((e) => setError(e.message));
   }, [filename]);
 
+  const handleDelete = async () => {
+    const password = prompt("Password to delete this note:");
+    if (!password) return;
+
+    setDeleting(true);
+    try {
+      await deleteNote(filename, password);
+      onBack();
+    } catch (e) {
+      setError(e.message);
+      setDeleting(false);
+    }
+  };
+
   return (
     <div>
-      <button className="back-button" onClick={onBack}>
-        ← Back
-      </button>
+      <div className="note-detail-header">
+        <button className="back-button" onClick={onBack}>
+          ← Back
+        </button>
+        <button
+          className="delete-button"
+          onClick={handleDelete}
+          disabled={deleting}
+        >
+          {deleting ? "Deleting..." : "Delete"}
+        </button>
+      </div>
       {error && <p className="error">{error}</p>}
       {!note && !error && <p>Loading...</p>}
       {note && <NoteHeader note={note} onSelectTag={onSelectTag} />}

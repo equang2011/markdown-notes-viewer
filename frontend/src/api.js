@@ -35,3 +35,15 @@ export async function uploadNote(file) {
   }
   return res.json();
 }
+
+export async function deleteNote(filename, password) {
+  const res = await fetch(
+    `${API_BASE}/notes/${encodeURIComponent(filename)}?password=${encodeURIComponent(password)}`,
+    { method: "DELETE" }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Delete failed");
+  }
+  return res.json();
+}

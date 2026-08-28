@@ -47,6 +47,7 @@ def write_metadata(notes: list[dict]) -> None:
 
 ALLOWED_EXTENSIONS = (".md", ".html", ".htm")
 MARKDOWN_EXTENSIONS = (".md",)
+DELETE_PASSWORD = os.environ.get("DELETE_PASSWORD", "")
 
 
 def is_markdown(filename: str) -> bool:
@@ -178,6 +179,26 @@ async def get_note(filename: str):
     if is_markdown(filename):
         _, content = frontmatter.split_frontmatter(content)
     return {**with_defaults(note), "content": content}
+
+
+@app.delete("/notes/{filename}")
+async def delete_note(filename: str, password: str = Query(...)):
+    if not DELETE_PASSWORD or password != DELETE_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid password")
+
+    notes = read_metadata()
+    note = next((n for n in notes if n["filename"] == filename), None)
+    if note is None:
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    file_path = UPLOADS_DIR / filename
+    if file_path.exists():
+        file_path.unlink()
+
+    notes = [n for n in notes if n["filename"] != filename]
+    write_metadata(notes)
+
+    return {"deleted": filename}
 
 
 # Serves the built frontend (frontend/dist copied here at Docker build time).
