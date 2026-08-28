@@ -45,7 +45,9 @@ export default function UploadForm({ onUploaded }) {
           handleFile(e.dataTransfer.files[0]);
         }}
       >
-        {busy ? "Uploading..." : "Tap to choose a .md or .html file or drag it here"}
+        {busy
+          ? "Uploading and tagging..."
+          : "Tap to choose a .md or .html file or drag it here"}
         <input
           ref={inputRef}
           type="file"

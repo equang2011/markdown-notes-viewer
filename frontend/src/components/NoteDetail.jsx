@@ -8,7 +8,41 @@ function isHtmlFilename(filename) {
   return name.endsWith(".html") || name.endsWith(".htm");
 }
 
-export default function NoteDetail({ filename, onBack }) {
+function NoteHeader({ note, onSelectTag }) {
+  const metaEntries = Object.entries(note.meta ?? {});
+  const hasTags = note.tags?.length > 0;
+  if (!hasTags && metaEntries.length === 0) return null;
+
+  return (
+    <div className="note-header">
+      {hasTags && (
+        <div className="note-tags">
+          {note.tags.map((tag) => (
+            <button
+              key={tag}
+              className="tag"
+              onClick={() => onSelectTag?.(tag)}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
+      {metaEntries.length > 0 && (
+        <dl className="note-fields">
+          {metaEntries.map(([key, value]) => (
+            <div key={key}>
+              <dt>{key}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
+export default function NoteDetail({ filename, onBack, onSelectTag }) {
   const [note, setNote] = useState(null);
   const [error, setError] = useState("");
 
@@ -27,6 +61,7 @@ export default function NoteDetail({ filename, onBack }) {
       </button>
       {error && <p className="error">{error}</p>}
       {!note && !error && <p>Loading...</p>}
+      {note && <NoteHeader note={note} onSelectTag={onSelectTag} />}
       {note && isHtmlFilename(note.filename) && (
         <article
           className="markdown-body"
