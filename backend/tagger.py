@@ -5,10 +5,13 @@ the note untagged. A tagging outage must never cost you an upload.
 """
 
 import json
+import logging
 import os
 import re
 
 import httpx
+
+log = logging.getLogger(__name__)
 
 GATEWAY_URL = os.environ.get(
     "GATEWAY_URL", "https://llm-gateway-production-b085.up.railway.app/invoke"
@@ -94,7 +97,12 @@ def _build_messages(body: str, known_tags: list[str]) -> list[dict]:
 
 def suggest(body: str, known_tags: list[str]) -> dict | None:
     """Return {"title": str, "tags": list[str]} or None if unavailable."""
-    if not is_configured() or not body.strip():
+    if not is_configured():
+        log.debug("auto-tagging disabled (GATEWAY_API_KEY not set)")
+        return None
+
+    if not body.strip():
+        log.debug("auto-tagging skipped: empty body")
         return None
 
     try:
@@ -107,15 +115,16 @@ def suggest(body: str, known_tags: list[str]) -> dict | None:
         response.raise_for_status()
         content = response.json().get("content")
     except (httpx.HTTPError, ValueError) as exc:
-        print(f"[tagger] gateway call failed: {type(exc).__name__}: {exc}")
+        log.warning(f"gateway call failed: {type(exc).__name__}: {exc}")
         return None
 
     if not isinstance(content, str):
+        log.warning(f"gateway response content is not a string: {type(content)}")
         return None
 
     parsed = _extract_json(content)
     if parsed is None:
-        print("[tagger] could not parse a JSON object from the model reply")
+        log.warning(f"could not parse JSON from model reply: {content[:200]}")
         return None
 
     raw_tags = parsed.get("tags")
@@ -130,6 +139,9 @@ def suggest(body: str, known_tags: list[str]) -> dict | None:
     title = str(title).strip()[:60] if isinstance(title, str) and title.strip() else None
 
     if not tags and not title:
+        log.warning("model returned neither title nor tags")
         return None
 
-    return {"title": title, "tags": tags[:MAX_TAGS]}
+    result = {"title": title, "tags": tags[:MAX_TAGS]}
+    log.info(f"tagged: title={title!r} tags={tags[:MAX_TAGS]}")
+    return result
