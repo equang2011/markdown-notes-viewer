@@ -36,6 +36,18 @@ export async function uploadNote(file) {
   return res.json();
 }
 
+export async function retagNote(filename, password) {
+  const res = await fetch(
+    `${API_BASE}/notes/${encodeURIComponent(filename)}/retag?password=${encodeURIComponent(password)}`,
+    { method: "POST" }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Retag failed");
+  }
+  return res.json();
+}
+
 export async function deleteNote(filename, password) {
   const res = await fetch(
     `${API_BASE}/notes/${encodeURIComponent(filename)}?password=${encodeURIComponent(password)}`,

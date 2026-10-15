@@ -181,6 +181,57 @@ async def get_note(filename: str):
     return {**with_defaults(note), "content": content}
 
 
+@app.post("/notes/{filename}/retag")
+async def retag_note(filename: str, password: str = Query(...)):
+    """Re-run the tagger on a stored note and rewrite its frontmatter.
+
+    Unlike upload, a gateway failure is an error here: the caller asked for tags
+    and should be told they didn't happen. The note is left untouched.
+    """
+    if not DELETE_PASSWORD or password != DELETE_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid password")
+
+    if not is_markdown(filename):
+        raise HTTPException(status_code=400, detail="Only .md notes can be tagged")
+
+    notes = read_metadata()
+    if not any(n["filename"] == filename for n in notes):
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    file_path = UPLOADS_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Note file missing on disk")
+
+    text = file_path.read_text(encoding="utf-8")
+    fields, body = frontmatter.split_frontmatter(text)
+
+    others = [n for n in notes if n["filename"] != filename]
+    suggestion = await run_in_threadpool(tagger.suggest, body, known_tags(others))
+    if suggestion is None or not suggestion["tags"]:
+        raise HTTPException(status_code=502, detail="Tagging service unavailable")
+
+    # Keep any fields the note already declares; only tags are replaced, and the
+    # title is filled in only if the note doesn't have one.
+    fields["tags"] = suggestion["tags"]
+    if not fields.get("title") and suggestion["title"]:
+        fields["title"] = suggestion["title"]
+    contents = frontmatter.dump(fields, body).encode("utf-8")
+    file_path.write_bytes(contents)
+
+    parsed, _ = frontmatter.parse(contents.decode("utf-8"), fallback_title=filename)
+
+    # Re-read: the gateway call may have taken a while.
+    notes = read_metadata()
+    for n in notes:
+        if n["filename"] == filename:
+            n.update(parsed)
+            n["size_bytes"] = len(contents)
+            updated = n
+    write_metadata(notes)
+
+    return with_defaults(updated)
+
+
 @app.delete("/notes/{filename}")
 async def delete_note(filename: str, password: str = Query(...)):
     if not DELETE_PASSWORD or password != DELETE_PASSWORD:

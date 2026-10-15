@@ -43,6 +43,7 @@ export default function App() {
           <NotesList
             notes={notes}
             onSelect={setSelected}
+            onChanged={loadNotes}
             emptyMessage={
               activeTag ? `No notes tagged "${activeTag}".` : undefined
             }
