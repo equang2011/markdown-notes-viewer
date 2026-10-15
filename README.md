@@ -100,4 +100,6 @@ The `Dockerfile` builds the frontend and serves it from FastAPI as one container
 3. Add an environment variable: `UPLOADS_DIR=/app/uploads` (points the app at the volume instead of the container's ephemeral disk).
 4. Deploy. Railway sets `PORT` automatically; the Dockerfile's `CMD` already binds to it.
 
+To keep strangers out, set `SITE_PASSWORD`. The browser then asks for a login on first visit (any username, that password) and every route, API included, requires it. Unset, the site is open. `DELETE_PASSWORD` additionally gates deleting and retagging.
+
 Uploaded notes and `notes.json` persist on the volume across redeploys. Don't scale this service to multiple replicas — the JSON metadata file isn't safe for concurrent writers.
