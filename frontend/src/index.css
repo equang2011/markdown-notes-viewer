@@ -223,3 +223,82 @@ h1 {
   padding: 0.75rem;
   border-radius: 6px;
 }
+
+.lock-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 1rem;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.lock-title {
+  font-size: 1.4rem;
+  margin: 0;
+}
+
+.lock-dots {
+  display: flex;
+  gap: 1rem;
+}
+
+.lock-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #1a1a1a;
+  transition: background 0.1s;
+}
+
+.lock-dot.filled {
+  background: #1a1a1a;
+}
+
+.lock-shake {
+  animation: lock-shake 0.4s;
+}
+
+@keyframes lock-shake {
+  20%, 60% { transform: translateX(-10px); }
+  40%, 80% { transform: translateX(10px); }
+}
+
+.lock-message {
+  min-height: 1.2rem;
+  margin: 0;
+  font-size: 0.9rem;
+  color: #c0392b;
+}
+
+.lock-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  width: min(300px, 90vw);
+}
+
+.lock-key {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: none;
+  background: #e6e7eb;
+  color: #1a1a1a;
+  font: inherit;
+  font-size: 2rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lock-key:active {
+  background: #c9ccd4;
+}
+
+.lock-key-back {
+  background: none;
+  font-size: 1.5rem;
+}

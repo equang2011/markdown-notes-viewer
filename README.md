@@ -100,6 +100,8 @@ The `Dockerfile` builds the frontend and serves it from FastAPI as one container
 3. Add an environment variable: `UPLOADS_DIR=/app/uploads` (points the app at the volume instead of the container's ephemeral disk).
 4. Deploy. Railway sets `PORT` automatically; the Dockerfile's `CMD` already binds to it.
 
-To keep strangers out, set `SITE_PASSWORD`. The browser then asks for a login on first visit (any username, that password) and every route, API included, requires it. Unset, the site is open. `DELETE_PASSWORD` additionally gates deleting and retagging.
+To keep strangers out, set `SITE_PASSWORD` to a PIN of **digits only** (6 recommended). Visitors see a phone-style keypad lock screen; a correct PIN sets a 30-day session cookie. The data routes (`/notes`, `/tags`) are refused without the cookie, and 5 wrong guesses lock that address out for a minute. Unset, the site is open. Changing the PIN signs everyone out. `DELETE_PASSWORD` additionally gates deleting and retagging.
+
+For local dev leave `SITE_PASSWORD` unset: the Vite dev server and backend are on different origins, so the cookie won't be sent.
 
 Uploaded notes and `notes.json` persist on the volume across redeploys. Don't scale this service to multiple replicas — the JSON metadata file isn't safe for concurrent writers.

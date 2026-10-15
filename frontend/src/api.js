@@ -3,15 +3,39 @@
 // backend, which serves both the API and the built frontend).
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
+// Thrown when the site lock rejects a request, so the app can show the lock
+// screen instead of an error message.
+export class LockedError extends Error {}
+
+export async function fetchAuthStatus() {
+  const res = await fetch(`${API_BASE}/auth/status`);
+  if (!res.ok) throw new Error("Failed to reach server");
+  return res.json();
+}
+
+export async function login(pin) {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pin }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Login failed");
+  }
+}
+
 export async function fetchNotes(tag) {
   const query = tag ? `?tag=${encodeURIComponent(tag)}` : "";
   const res = await fetch(`${API_BASE}/notes${query}`);
+  if (res.status === 401) throw new LockedError("Locked");
   if (!res.ok) throw new Error("Failed to load notes");
   return res.json();
 }
 
 export async function fetchTags() {
   const res = await fetch(`${API_BASE}/tags`);
+  if (res.status === 401) throw new LockedError("Locked");
   if (!res.ok) throw new Error("Failed to load tags");
   return res.json();
 }

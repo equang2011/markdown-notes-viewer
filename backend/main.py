@@ -1,7 +1,5 @@
-import base64
 import json
 import os
-import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,11 +7,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, File, HTTPException, Query, Request, Response, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
+import auth
 import frontmatter
 import tagger
 
@@ -31,32 +30,8 @@ if not METADATA_FILE.exists():
 
 app = FastAPI(title="Markdown Notes Viewer")
 
-# Optional site-wide HTTP Basic Auth. Any username works; only the password is
-# checked. Unset (the default) leaves the site open, e.g. for local dev.
-SITE_PASSWORD = os.environ.get("SITE_PASSWORD", "")
-
-
-@app.middleware("http")
-async def require_site_password(request: Request, call_next):
-    if not SITE_PASSWORD or request.method == "OPTIONS":
-        return await call_next(request)
-
-    header = request.headers.get("authorization", "")
-    scheme, _, encoded = header.partition(" ")
-    if scheme.lower() == "basic":
-        try:
-            _, _, password = base64.b64decode(encoded).decode("utf-8").partition(":")
-        except (ValueError, UnicodeDecodeError):
-            password = ""
-        if secrets.compare_digest(password.encode(), SITE_PASSWORD.encode()):
-            return await call_next(request)
-
-    return Response(
-        status_code=401,
-        content="Authentication required",
-        headers={"WWW-Authenticate": 'Basic realm="Markdown Notes"'},
-    )
-
+app.include_router(auth.router)
+app.middleware("http")(auth.require_session)
 
 # Added after the auth middleware so it sits outside it and CORS headers still
 # reach 401 responses.
