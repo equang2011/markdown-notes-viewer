@@ -15,6 +15,7 @@ from starlette.concurrency import run_in_threadpool
 import auth
 import frontmatter
 import tagger
+import titles
 
 BASE_DIR = Path(__file__).parent
 
@@ -87,11 +88,22 @@ def autotag(text: str, existing: list[dict]) -> str | None:
     return frontmatter.dump(block, body) if block else None
 
 
+def note_fields(filename: str, text: str) -> dict:
+    """The title/tags/meta we store for a note, read from its file contents."""
+    if is_markdown(filename):
+        _, body = frontmatter.split_frontmatter(text)
+        fields, _ = frontmatter.parse(
+            text, fallback_title=titles.derive(filename, body)
+        )
+        return fields
+    return {"title": titles.derive(filename, text), "tags": [], "meta": {}}
+
+
 def with_defaults(note: dict) -> dict:
     """Notes uploaded before frontmatter support have no title/tags/meta."""
     return {
         **note,
-        "title": note.get("title") or note["filename"],
+        "title": note.get("title") or titles.from_filename(note["filename"]),
         "tags": note.get("tags") or [],
         "meta": note.get("meta") or {},
     }
@@ -115,28 +127,26 @@ async def upload_note(file: UploadFile = File(...)):
         "filename": dest_path.name,
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
         "size_bytes": len(contents),
-        "title": dest_path.name,
-        "tags": [],
-        "meta": {},
     }
 
     # Frontmatter lives in the stored file, which stays the source of truth; the
     # block is stripped again when the note is served.
-    if is_markdown(dest_path.name):
-        try:
-            text = contents.decode("utf-8")
-        except UnicodeDecodeError:
-            text = None
+    try:
+        text = contents.decode("utf-8")
+        decoded = True
+    except UnicodeDecodeError:
+        # Still good enough to pull a title out of; never written back.
+        text = contents.decode("utf-8", errors="replace")
+        decoded = False
 
-        if text is not None:
-            # Blocking gateway call — keep it off the event loop.
-            tagged = await run_in_threadpool(autotag, text, notes)
-            if tagged is not None:
-                text = tagged
-                contents = text.encode("utf-8")
-                note["size_bytes"] = len(contents)
-            fields, _ = frontmatter.parse(text, fallback_title=dest_path.name)
-            note.update(fields)
+    if decoded and is_markdown(dest_path.name):
+        # Blocking gateway call — keep it off the event loop.
+        tagged = await run_in_threadpool(autotag, text, notes)
+        if tagged is not None:
+            text = tagged
+            contents = text.encode("utf-8")
+            note["size_bytes"] = len(contents)
+    note.update(note_fields(dest_path.name, text))
 
     dest_path.write_bytes(contents)
 
@@ -224,7 +234,7 @@ async def retag_note(filename: str, password: str = Query(...)):
     contents = frontmatter.dump(fields, body).encode("utf-8")
     file_path.write_bytes(contents)
 
-    parsed, _ = frontmatter.parse(contents.decode("utf-8"), fallback_title=filename)
+    parsed = note_fields(filename, contents.decode("utf-8"))
 
     # Re-read: the gateway call may have taken a while.
     notes = read_metadata()
